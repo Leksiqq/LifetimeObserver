@@ -9,6 +9,7 @@ public class LifetimeObserver
     private readonly Key _noKey = new();
     private readonly List<ServiceDescriptor> _replacements = [];
     private readonly object _lock = new();
+    private readonly HashSet<Type> _tracedTypes = [];
     private IServiceCollection? _serviceDescriptors;
     public void Trace(Type type)
     {
@@ -16,6 +17,7 @@ public class LifetimeObserver
         {
             throw new InvalidOperationException();
         }
+        _tracedTypes.Add(type);
         ServiceDescriptor[] descriptors = _serviceDescriptors!.Where(sd => sd.ServiceType == type).ToArray();
         if (descriptors.Length == 0)
         {
@@ -121,26 +123,17 @@ public class LifetimeObserver
             }
         }
     }
-
-    private object GetService(IServiceProvider serviceProvider, Type serviceType, Key serviceKey)
-    {
-        object result = serviceProvider.GetRequiredKeyedService(serviceType, serviceKey);
-        if (!_tracers.TryGetValue(result, out _))
-        {
-            lock (_lock)
-            {
-                if (!_tracers.TryGetValue(result, out _))
-                {
-                    _tracers.Add(result, new Tracer(this, result));
-                }
-            }
-        }
-        return result;
-    }
-
     public void Trace<T>()
     {
         Trace(typeof(T));
+    }
+    public IEnumerable<Type> GetTracedTypes()
+    {
+        if(_serviceDescriptors is { })
+        {
+            throw new InvalidOperationException();
+        }
+        return _tracedTypes.Select(t => t);
     }
     internal void Start(IServiceCollection services)
     {
@@ -159,5 +152,20 @@ public class LifetimeObserver
     internal void ReportLifetimeEvent(LifetimeEventKind kind, Type type, int hash, string info)
     {
         LifetimeEventOccured?.Invoke(this, new LifetimeEventArgs { Kind = kind, Type = type, Hash = hash, Info = info });
+    }
+    private object GetService(IServiceProvider serviceProvider, Type serviceType, Key serviceKey)
+    {
+        object result = serviceProvider.GetRequiredKeyedService(serviceType, serviceKey);
+        if (!_tracers.TryGetValue(result, out _))
+        {
+            lock (_lock)
+            {
+                if (!_tracers.TryGetValue(result, out _))
+                {
+                    _tracers.Add(result, new Tracer(this, result));
+                }
+            }
+        }
+        return result;
     }
 }
