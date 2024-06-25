@@ -2,20 +2,20 @@
 internal class Tracer
 {
     private readonly LifetimeObserver _lifetimeObserver;
-    internal Type Type { get; private init; }
-    internal string Info { get; private set; }
-    internal int Hash { get; private set; }
+    private readonly Type _type;
+    private readonly string _info;
+    private readonly int _hash;
     internal Tracer(LifetimeObserver lifetimeObserver, object obj)
     {
         _lifetimeObserver = lifetimeObserver;
-        Type = obj.GetType();
-        Info = obj.ToString() ?? string.Empty;
-        Hash = obj.GetHashCode();
-        _lifetimeObserver.ReportLifetimeEvent(LifetimeEventKind.Created, Type, Hash, Info);
+        _type = obj.GetType();
+        _info = obj.ToString() ?? string.Empty;
+        _hash = obj.GetHashCode();
+        _lifetimeObserver.ReportLifetimeEvent(LifetimeEventKind.Created, _type, _hash, _info);
     }
 
     ~Tracer()
     {
-        _lifetimeObserver.ReportLifetimeEvent(LifetimeEventKind.Finalized, Type, Hash, Info);
+        _lifetimeObserver.ReportLifetimeEvent(LifetimeEventKind.Finalized, _type, _hash, _info);
     }
 }

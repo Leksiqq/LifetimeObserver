@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Net.Leksi.Util;
 
@@ -64,7 +65,6 @@ public class Tests
         {
             if (e.Kind is LifetimeEventKind.Created)
             {
-                Console.WriteLine(e.Kind);
                 ++counts[e.Type];
             }
             else
@@ -73,10 +73,6 @@ public class Tests
                 --counts[e.Type];
             }
         };
-        foreach (var it in counts)
-        {
-            Console.WriteLine($"{it.Key}: {it.Value}");
-        }
         serviceScope = host.Services.CreateScope();
         for (int i = 0; i < requests.Count; ++i)
         {
@@ -172,54 +168,6 @@ public class Tests
                 }
             }
         }
-    }
-
-    public static HostApplicationBuilder BuildImplementationFactory()
-    {
-        HostApplicationBuilder builder = Host.CreateApplicationBuilder();
-        builder.Services.AddSingleton(s => new SingletonModel());
-        builder.Services.AddScoped<ScopedModel>(s => new ScopedModel());
-        builder.Services.AddTransient<TransientModel>(s => new TransientModel());
-        builder.Services.AddKeyedSingleton(1, (s, key) => new SingletonModel());
-        builder.Services.AddKeyedSingleton(2, (s, key) => new SingletonModel());
-        builder.Services.AddKeyedScoped<ScopedModel>(3, (s, key) => new ScopedModel());
-        builder.Services.AddKeyedScoped<ScopedModel>(4, (s, key) => new ScopedModel());
-        builder.Services.AddKeyedTransient<TransientModel>(5, (s, key) => new TransientModel());
-        builder.Services.AddKeyedTransient<TransientModel>(6, (s, key) => new TransientModel());
-        return builder;
-    }
-
-    public static HostApplicationBuilder BuildImplementationInstance()
-    {
-        HostApplicationBuilder builder = Host.CreateApplicationBuilder();
-        builder.Services.AddSingleton(new SingletonModel());
-        builder.Services.AddScoped<ScopedModel>();
-        builder.Services.AddTransient<TransientModel>();
-        builder.Services.AddKeyedSingleton(1, new SingletonModel());
-        builder.Services.AddKeyedSingleton(2, new SingletonModel());
-        builder.Services.AddKeyedScoped<ScopedModel>(3);
-        builder.Services.AddKeyedScoped<ScopedModel>(4);
-        builder.Services.AddKeyedTransient<TransientModel>(5);
-        builder.Services.AddKeyedTransient<TransientModel>(6);
-        return builder;
-    }
-
-    public static HostApplicationBuilder BuildImplementationType()
-    {
-        HostApplicationBuilder builder = Host.CreateApplicationBuilder();
-        builder.Services.AddSingleton<SingletonModel>();
-        builder.Services.AddScoped<ScopedModel>();
-        builder.Services.AddTransient<TransientModel>();
-        builder.Services.AddKeyedSingleton<SingletonModel>(null);
-        builder.Services.AddKeyedSingleton<SingletonModel>(1);
-        builder.Services.AddKeyedSingleton<SingletonModel>(2);
-        builder.Services.AddKeyedScoped<ScopedModel>(null);
-        builder.Services.AddKeyedScoped<ScopedModel>(3);
-        builder.Services.AddKeyedScoped<ScopedModel>(4);
-        builder.Services.AddKeyedTransient<TransientModel>(null);
-        builder.Services.AddKeyedTransient<TransientModel>(5);
-        builder.Services.AddKeyedTransient<TransientModel>(6);
-        return builder;
     }
     public static Model? ModelRequest(IServiceScope serviceScope, IHost host, int variant)
     {

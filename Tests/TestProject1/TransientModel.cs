@@ -1,5 +1,4 @@
 ﻿namespace TestProject1;
-
-public class TransientModel : Model
+public class TransientModel : Model, ITransientByType, ITransientByFactory
 {
 }
