@@ -4,6 +4,7 @@ namespace Net.Leksi.Util;
 public class LifetimeObserver
 {
     public event LifetimeEventHandler? LifetimeEventOccured;
+    public event ProxyPassthroughEventHandler? ProxyPassthroughOccured;
     private readonly ConditionalWeakTable<object, Tracer> _tracers = [];
     private readonly Dictionary<object, Key> _keys = [];
     private readonly Key _noKey = new();
@@ -18,7 +19,25 @@ public class LifetimeObserver
             throw new InvalidOperationException();
         }
         _tracedTypes.Add(type);
-        ServiceDescriptor[] descriptors = _serviceDescriptors!.Where(sd => sd.ServiceType == type).ToArray();
+        ServiceDescriptor[] descriptors = _serviceDescriptors!.Where(sd => 
+            sd.ServiceType == type
+            || (
+                !sd.IsKeyedService 
+                && (
+                    sd.ImplementationType == type
+                    || sd.ImplementationInstance?.GetType() == type
+                    || (sd.ImplementationFactory?.Method.ReturnType.IsAssignableFrom(type) ?? false)
+                )
+            )
+            || (
+                sd.IsKeyedService
+                && (
+                    sd.KeyedImplementationType == type
+                    || sd.KeyedImplementationInstance?.GetType() == type
+                    || (sd.KeyedImplementationFactory?.Method.ReturnType.IsAssignableFrom(type) ?? false)
+                )
+            )
+        ).ToArray();
         if (descriptors.Length == 0)
         {
             throw new InvalidOperationException($"No service for type {type} found!");
@@ -74,7 +93,7 @@ public class LifetimeObserver
                     new ServiceDescriptor(
                         sd.ServiceType,
                         sd.ServiceKey,
-                        (s, k) => GetService(s, sd.ServiceType, key),
+                        (s, k) => GetService(s, sd.ServiceType, key, type),
                         sd.Lifetime
                     )
                 );
@@ -116,7 +135,7 @@ public class LifetimeObserver
                 _replacements.Add(
                     new ServiceDescriptor(
                         sd.ServiceType,
-                        s => GetService(s, sd.ServiceType, key),
+                        s => GetService(s, sd.ServiceType, key, type),
                         sd.Lifetime
                     )
                 );
@@ -135,12 +154,12 @@ public class LifetimeObserver
         }
         return _tracedTypes.Select(t => t);
     }
-    internal void Start(IServiceCollection services)
+    internal void StartConfiguring(IServiceCollection services)
     {
         _serviceDescriptors = services;
         _replacements.Clear();
     }
-    internal void Finish()
+    internal void FinishConfiguring()
     {
         foreach (ServiceDescriptor sd in _replacements)
         {
@@ -153,16 +172,29 @@ public class LifetimeObserver
     {
         LifetimeEventOccured?.Invoke(this, new LifetimeEventArgs { Kind = kind, Type = type, Hash = hash, Info = info });
     }
-    private object GetService(IServiceProvider serviceProvider, Type serviceType, Key serviceKey)
+    private object GetService(IServiceProvider serviceProvider, Type serviceType, Key serviceKey, Type expectedType)
     {
         object result = serviceProvider.GetRequiredKeyedService(serviceType, serviceKey);
-        if (!_tracers.TryGetValue(result, out _))
+        if(result.GetType() == expectedType)
         {
-            lock (_lock)
+            if(ProxyPassthroughOccured is { })
             {
-                if (!_tracers.TryGetValue(result, out _))
+                ProxyPassthroughOccured.Invoke(this, new ProxyPassthroughEventArgs { 
+                    ServiceType = serviceType, 
+                    ServiceKey = serviceKey, 
+                    Type = expectedType, 
+                    Hash = result.GetHashCode() 
+                });
+            }
+            //Console.WriteLine($"/{result.GetType()}@{result.GetHashCode()}");
+            if (!_tracers.TryGetValue(result, out _))
+            {
+                lock (_lock)
                 {
-                    _tracers.Add(result, new Tracer(this, result));
+                    if (!_tracers.TryGetValue(result, out _))
+                    {
+                        _tracers.Add(result, new Tracer(this, result));
+                    }
                 }
             }
         }

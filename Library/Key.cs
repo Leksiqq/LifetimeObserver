@@ -1,5 +1,5 @@
 ﻿namespace Net.Leksi.Util;
-internal class Key
+public class Key
 {
     internal object? SourceKey { get; private init; }
     internal Key(object? sourceKey = null)

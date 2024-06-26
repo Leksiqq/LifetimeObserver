@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
@@ -19,6 +19,8 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\Demo\LifetimeObserverDemoCommon\LifetimeObserverDemoCommon.csproj" />
+    <ProjectReference Include="..\..\Demo\LifetimeObserverDemo\LifetimeObserverDemo.csproj" />
     <ProjectReference Include="..\..\Library\LifetimeObserver.csproj" />
   </ItemGroup>
 
