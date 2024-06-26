@@ -4,9 +4,8 @@ using Net.Leksi.LifetimeObserverDemo;
 using Net.Leksi.Util;
 using System.Diagnostics;
 using System.Text;
-using static System.Runtime.InteropServices.JavaScript.JSType;
+using System.Web;
 namespace TestProject1;
-
 public class Tests
 {
     private readonly bool _printServiceDescriptors = false;
@@ -42,9 +41,13 @@ public class Tests
             };
             dotnet.OutputDataReceived += (s, e) =>
             {
-                if (e.Data?.Contains("LifetimeObserverDemo") ?? false)
+                Console.WriteLine(e.Data);
+                if (demoProjectPath is null && (e.Data?.Contains("LifetimeObserverDemo.csproj") ?? false))
                 {
-                    demoProjectPath = Path.Combine(dir.FullName, e.Data.Trim());
+                    Uri uri = new($"{dir.FullName}/_");
+                    string relPath = e.Data.Trim().Replace(Path.DirectorySeparatorChar, '/');
+                    Uri demoProjectPathUri = new(uri, relPath);
+                    demoProjectPath = Path.GetDirectoryName(HttpUtility.UrlDecode(demoProjectPathUri.AbsolutePath));
                 }
             };
             dotnet.ErrorDataReceived += (s, e) =>
