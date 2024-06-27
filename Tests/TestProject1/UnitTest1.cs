@@ -9,13 +9,13 @@ using System.Web;
 namespace TestProject1;
 public class Tests
 {
-    private readonly bool _printServiceDescriptors = false;
     [SetUp]
     public static void Setup()
     {
         Model.ResetIdGen();
     }
     [Test]
+    [TestCase(-1, 1000, 10)]
     [TestCase(-1, 1000000, 1000)]
     public void TestObserver(int seed, int requestCounts, int referencedCount)
     {
@@ -110,14 +110,7 @@ public class Tests
             Assert.That(lifetimeEntries.Values.Where(v => !v.Created || !v.Passed || !v.Traced), Is.Empty);
             Assert.That(lifetimeEntries.Values.Where(v => v.Untraced != v.Finalized), Is.Empty);
         });
-        if(buildConfigurationName == "Release")
-        {
-            Assert.That(lifetimeEntries, Is.Empty);
-        }
-        else
-        {
-            Assert.That(lifetimeEntries, Has.Count.LessThanOrEqualTo(AuxMethods.s_ModelRequestsCount));
-        }
+        Assert.That(lifetimeEntries, Has.Count.LessThanOrEqualTo(AuxMethods.s_ModelRequestsCount));
 
         Console.WriteLine(lifetimeEntries.Count);
 
@@ -137,7 +130,8 @@ public class Tests
         {
             if (logEntry.StartsWith("log:"))
             {
-                string[] parts = logEntry.Substring("log:".Length).Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+                //Console.WriteLine(logEntry);
+                string[] parts = logEntry["log:".Length..].Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
                 LifetimeEntry? lifetimeEntry = null;
                 switch (parts[0])
                 {
@@ -164,7 +158,7 @@ public class Tests
                         }
                         break;
                     case "Created":
-                        Assert.That(parts.Length, Is.EqualTo(3));
+                        Assert.That(parts, Has.Length.EqualTo(3));
                         if (int.TryParse(parts[2], out int id))
                         {
                             if (lifetimeEntries.ContainsKey(id))
@@ -185,7 +179,7 @@ public class Tests
                         }
                         break;
                     case "Passed":
-                        Assert.That(parts.Length, Is.EqualTo(3));
+                        Assert.That(parts, Has.Length.EqualTo(3));
                         if (GetLifetimeEntry(parts[1], parts[2]) is LifetimeEntry entry)
                         {
                             Assert.Multiple(() =>
@@ -204,7 +198,7 @@ public class Tests
                         }
                         break;
                     case "Traced":
-                        Assert.That(parts.Length, Is.EqualTo(3));
+                        Assert.That(parts, Has.Length.EqualTo(4));
                         if (GetLifetimeEntry(parts[1], parts[2]) is LifetimeEntry entry1)
                         {
                             Assert.Multiple(() =>
@@ -215,6 +209,9 @@ public class Tests
                             });
                             lifetimeEntry = entry1;
                             lifetimeEntry.Traced = true;
+                            lifetimeEntry.Info = parts[3];
+                            lifetimeEntry.NewInfo = parts[3];
+
                             ++tracedCount;
                         }
                         else
@@ -223,12 +220,13 @@ public class Tests
                         }
                         break;
                     case "Untraced":
-                        Assert.That(parts.Length, Is.EqualTo(3));
+                        Assert.That(parts, Has.Length.EqualTo(4));
                         if (GetLifetimeEntry(parts[1], parts[2]) is LifetimeEntry entry2)
                         {
                             Assert.That(entry2.Untraced, Is.False, $"Invalid lifetime order: {logEntry}.");
                             lifetimeEntry = entry2;
                             lifetimeEntry.Untraced = true;
+                            Assert.That(lifetimeEntry.NewInfo, Is.EqualTo(parts[3]));
                             --tracedCount;
                             Assert.That(!isRunning || tracedCount >= referencedCount);
                         }
@@ -238,7 +236,7 @@ public class Tests
                         }
                         break;
                     case "Finalized":
-                        Assert.That(parts.Length, Is.EqualTo(3));
+                        Assert.That(parts, Has.Length.EqualTo(3));
                         if (GetLifetimeEntry(parts[1], parts[2]) is LifetimeEntry entry3)
                         {
                             Assert.That(entry3.Finalized, Is.False, $"Invalid lifetime order: {logEntry}.");
@@ -251,7 +249,7 @@ public class Tests
                         }
                         break;
                     case "Variant":
-                        Assert.That(parts.Length, Is.EqualTo(4));
+                        Assert.That(parts, Has.Length.EqualTo(4));
                         if (GetLifetimeEntry(parts[1], parts[2]) is LifetimeEntry entry4 && int.TryParse(parts[3], out int variant))
                         {
                             Assert.Multiple(() =>
@@ -271,6 +269,25 @@ public class Tests
                         break;
                     case "Finished":
                         isRunning = false;
+                        break;
+                    case "Info":
+                        Assert.That(parts, Has.Length.AtLeast(4));
+                        if (GetLifetimeEntry(parts[1], parts[2]) is LifetimeEntry entry5)
+                        {
+                            Assert.Multiple(() =>
+                            {
+                                Assert.That(entry5.Passed, Is.True, $"Invalid lifetime order: {logEntry}.");
+                                Assert.That(entry5.Traced, Is.True, $"Invalid lifetime order: {logEntry}.");
+                                Assert.That(entry5.Untraced, Is.False, $"Invalid lifetime order: {logEntry}.");
+                                Assert.That(entry5.Finalized, Is.False, $"Invalid lifetime order: {logEntry}.");
+                            });
+                            lifetimeEntry = entry5;
+                            lifetimeEntry.NewInfo = parts[3];
+                        }
+                        else
+                        {
+                            Assert.Fail($"Invalid log entry: {logEntry}.");
+                        }
                         break;
                 }
                 if (lifetimeEntry is { })

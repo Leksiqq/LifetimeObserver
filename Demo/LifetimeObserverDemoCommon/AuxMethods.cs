@@ -33,11 +33,11 @@ public static class AuxMethods
     }
     public static void AddTraces(IServiceCollection services)
     {
-        services.AddLIfetimeObserver(lto =>
+        services.AddLifetimeObserver(lto =>
         {
-            lto.Trace(typeof(SingletonModel));
-            lto.Trace(typeof(ScopedModel));
-            lto.Trace(typeof(TransientModel));
+            lto.Trace<SingletonModel>();
+            lto.Trace<ScopedModel>();
+            lto.Trace<TransientModel>();
         });
     }
     public static IModel? ModelRequest(IServiceProvider services, int variant)

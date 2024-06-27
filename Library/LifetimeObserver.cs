@@ -33,10 +33,17 @@ public class LifetimeObserver
                 KindOfError = LifetimeObserverException.Kind.CalledOutsideOfConfiguring
             };
         }
+        if (!type.IsClass)
+        {
+            throw new LifetimeObserverException($"{nameof(type)} must be a class.")
+            {
+                Type = type,
+                KindOfError = LifetimeObserverException.Kind.NotAClass
+            };
+        }
         _tracedTypes.Add(type);
         ServiceDescriptor[] descriptors = _serviceDescriptors!.Where(sd => 
-            sd.ServiceType == type
-            || (
+            (
                 !sd.IsKeyedService 
                 && (
                     sd.ImplementationType == type
@@ -171,10 +178,22 @@ public class LifetimeObserver
         {
             throw new LifetimeObserverException("Must be called after the host is built.")
             {
-                KindOfError = LifetimeObserverException.Kind.CalledBeforeHostIsBuilt
+                KindOfError = LifetimeObserverException.Kind.CalledInsideOfConfiguring
             };
         }
         return _tracedTypes.Select(t => t);
+    }
+    public bool ChangeInfo(object obj, object? info)
+    {
+        lock (_lock)
+        {
+            if (_tracers.TryGetValue(obj, out Tracer? tracer))
+            {
+                tracer.ChangeInfo(info);
+                return true;
+            }
+        }
+        return false;
     }
     internal void StartConfiguring(IServiceCollection services)
     {
@@ -190,7 +209,7 @@ public class LifetimeObserver
         _serviceDescriptors = null;
         _replacements.Clear();
     }
-    internal void ReportLifetimeEvent(LifetimeEventKind kind, Type type, int hash, string info)
+    internal void ReportLifetimeEvent(LifetimeEventKind kind, Type type, int hash, object? info)
     {
         LifetimeEventOccured?.Invoke(this, new LifetimeEventArgs { Kind = kind, Type = type, Hash = hash, Info = info });
     }

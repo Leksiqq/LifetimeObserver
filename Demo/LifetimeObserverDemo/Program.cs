@@ -3,7 +3,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Net.Leksi.LifetimeObserverDemo;
 using Net.Leksi.Util;
-using System.Reflection;
 
 const string s_referencedCount = "referenced-count";
 const string s_requestsCount = "requests-count";
@@ -12,6 +11,7 @@ const string s_askKey = "/?";
 const string s_helpKey = "--help";
 const string s_clearLine = "                                                                                                         ";
 const string s_withLogStyle = "with-log-style";
+const string s_nextTracedCount = "next-traced-count";
 
 if (args.Contains(s_askKey) || args.Contains(s_helpKey))
 {
@@ -23,12 +23,13 @@ void Usage()
 {
     Console.WriteLine(
         string.Format(
-            "Usage:\n {0} [--{1}} <number>] [--{2}} <number>] [--{3} <number>] [--{4} {{1|0}}]",
+            "Usage:\n {0} [--{1}} <number>] [--{2}} <number>] [--{3} <number>] [--{4} {{1|0}}] [--{5} <number>]",
             Path.GetFileName(Environment.ProcessPath),
             s_referencedCount,
             s_requestsCount,
             s_seed,
-            s_withLogStyle
+            s_withLogStyle,
+            s_nextTracedCount
         )
     );
 }
@@ -49,7 +50,9 @@ int requestsCount = 0;
 if (bootstrapConfig[s_requestsCount] is string s2 && int.TryParse(s2, out requestsCount)) { }
 int seed = -1;
 if (bootstrapConfig[s_seed] is string s3 && int.TryParse(s3, out seed)) { }
-bool withLogStyle = bootstrapConfig[s_withLogStyle] is string s4 && s4 == "1";
+int nextTracedCount = 0;
+if (bootstrapConfig[s_nextTracedCount] is string s4 && int.TryParse(s4, out nextTracedCount)) { }
+bool withLogStyle = bootstrapConfig[s_withLogStyle] is string s5 && s5 == "1";
 
 int prevSeed = seed;
 IEnumerable<ScriptEntry> script = AuxMethods.GetScript(ref seed, 0.1, 0.5).Select(e =>
@@ -65,6 +68,9 @@ if (requestsCount > 0)
 {
     script = script.Take(requestsCount);
 }
+
+Random changeInfoRandom = new(seed * 37);
+double changeInfoRatio = 0.1;
 
 int headerLinesCount = 0;
 if (withLogStyle)
@@ -107,6 +113,10 @@ using (IHost host = builder.Build())
     LifetimeObserver? lifetimeObserver = null;
     lifetimeObserver = host.Services.GetRequiredService<LifetimeObserver>();
     lifetimeObserver.LifetimeEventOccured += OnLifetimeEventOccured;
+    if(nextTracedCount > 0)
+    {
+        lifetimeObserver.CountTracedForRaisingEvent = nextTracedCount;
+    }
     lifetimeObserver.NextTracedCount += OnNextTracedCount;
     if (withLogStyle)
     {
@@ -133,6 +143,12 @@ using (IHost host = builder.Build())
             if (withLogStyle)
             {
                 Console.WriteLine($"log: Variant {model!.GetType()} {model.GetHashCode()} {model.Variant}");
+            }
+            if(withLogStyle && changeInfoRandom.NextDouble() < changeInfoRatio)
+            {
+                string info = Guid.NewGuid().ToString();
+                bool res = lifetimeObserver.ChangeInfo(model!, info);
+                Console.WriteLine($"log: Info {model!.GetType()} {model.GetHashCode()} {info} {res}");
             }
         }
     }
@@ -179,7 +195,7 @@ void OnLifetimeEventOccured(object? sender, LifetimeEventArgs args)
     {
         if(sender is LifetimeObserver)
         {
-            Console.WriteLine($"log: {(args.Kind is LifetimeEventKind.Created ? "Traced" : "Untraced")} {args.Type} {args.Hash}");
+            Console.WriteLine($"log: {(args.Kind is LifetimeEventKind.Created ? "Traced" : "Untraced")} {args.Type} {args.Hash} {args.Info}");
         }
         else
         {

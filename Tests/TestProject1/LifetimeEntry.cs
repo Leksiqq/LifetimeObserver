@@ -9,8 +9,10 @@ public class LifetimeEntry
     public bool Untraced { get; set; }
     public bool Finalized { get; set; }
     public int Variant { get; set; } = -1;
+    public object? Info { get; set; }
+    public object? NewInfo { get; set; }
     public override string ToString()
     {
-        return $"{Id}, {TypeName}, {Created}, {Passed}, {Traced}, {Untraced}, {Finalized}, {Variant}";
+        return $"{Id}, {TypeName}, {Created}, {Passed}, {Traced}, {Untraced}, {Finalized}, {Variant}, {Info}, {NewInfo}";
     }
 }
