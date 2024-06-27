@@ -2,7 +2,7 @@
   "profiles": {
     "LifetimeObserverDemo": {
       "commandName": "Project",
-      "commandLineArgs": "--referenced-count 1000 --with-lifetime-observer 1\r\n--requests-count 0 --seed -1\r\n--use-passed 1",
+      "commandLineArgs": "--referenced-count 1000 \r\n--requests-count 0 \r\n--seed -1\r\n--log-style 0",
       "workingDirectory": "W:\\C#\\LifetimeObserver"
     }
   }

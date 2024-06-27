@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Net.Leksi.LifetimeObserverDemo;
 using Net.Leksi.Util;
+using System.Reflection;
 
 const string s_referencedCount = "referenced-count";
 const string s_requestsCount = "requests-count";
@@ -10,7 +11,7 @@ const string s_seed = "seed";
 const string s_askKey = "/?";
 const string s_helpKey = "--help";
 const string s_clearLine = "                                                                                                         ";
-const string s_usePassed = "use-passed";
+const string s_withLogStyle = "with-log-style";
 
 if (args.Contains(s_askKey) || args.Contains(s_helpKey))
 {
@@ -22,16 +23,18 @@ void Usage()
 {
     Console.WriteLine(
         string.Format(
-            "Usage:\n {0} [--{1}} <number>] [--{2} <number>] [--{3} {{1|0}}]",
+            "Usage:\n {0} [--{1}} <number>] [--{2}} <number>] [--{3} <number>] [--{4} {{1|0}}]",
             Path.GetFileName(Environment.ProcessPath),
             s_referencedCount,
+            s_requestsCount,
             s_seed,
-            s_usePassed
+            s_withLogStyle
         )
     );
 }
 
 Dictionary<Type, int> counts = [];
+object locker = new();
 
 bool isRunning = true;
 Console.CancelKeyPress += Console_CancelKeyPress;
@@ -46,7 +49,8 @@ int requestsCount = 0;
 if (bootstrapConfig[s_requestsCount] is string s2 && int.TryParse(s2, out requestsCount)) { }
 int seed = -1;
 if (bootstrapConfig[s_seed] is string s3 && int.TryParse(s3, out seed)) { }
-bool usePassed = bootstrapConfig[s_usePassed] is string s4 && s4 == "1";
+bool withLogStyle = bootstrapConfig[s_withLogStyle] is string s4 && s4 == "1";
+
 int prevSeed = seed;
 IEnumerable<ScriptEntry> script = AuxMethods.GetScript(ref seed, 0.1, 0.5).Select(e =>
     {
@@ -62,21 +66,8 @@ if (requestsCount > 0)
     script = script.Take(requestsCount);
 }
 
-if (!usePassed)
-{
-    Console.WriteLine($"{nameof(referencedCount)}: {referencedCount}");
-    Console.WriteLine($"{(prevSeed != seed ? "generated " : string.Empty)}{nameof(seed)}: {seed}");
-    if (requestsCount > 0)
-    {
-        Console.WriteLine($"{nameof(requestsCount)}: {requestsCount}");
-    }
-    else
-    {
-        Console.WriteLine("Press Ctrl-C to finish");
-    }
-    Console.WriteLine();
-}
-else
+int headerLinesCount = 0;
+if (withLogStyle)
 {
     Console.WriteLine($"log: {nameof(referencedCount)} {referencedCount}");
     Console.WriteLine($"log: {nameof(seed)} {seed}{(prevSeed != seed ? " generated" : string.Empty)}");
@@ -85,9 +76,26 @@ else
         Console.WriteLine($"log: {nameof(requestsCount)} {requestsCount}");
     }
 }
-int headerLinesCount = 5;
+else
+{
+    Console.WriteLine($"{nameof(referencedCount)}: {referencedCount}");
+    ++headerLinesCount;
+    Console.WriteLine($"{(prevSeed != seed ? "generated " : string.Empty)}{nameof(seed)}: {seed}");
+    ++headerLinesCount;
+    if (requestsCount > 0)
+    {
+        Console.WriteLine($"{nameof(requestsCount)}: {requestsCount}");
+    }
+    else
+    {
+        Console.WriteLine("Press Ctrl-C to finish");
+    }
+    ++headerLinesCount;
+    Console.WriteLine();
+    ++headerLinesCount;
+}
 
-Model.LifetimeEventOccured += Model_LifetimeEventOccured;
+Model.LifetimeEventOccured += OnLifetimeEventOccured;
 
 HostApplicationBuilder builder = AuxMethods.CreateBuilder();
 
@@ -98,12 +106,12 @@ using (IHost host = builder.Build())
 {
     LifetimeObserver? lifetimeObserver = null;
     lifetimeObserver = host.Services.GetRequiredService<LifetimeObserver>();
-    lifetimeObserver.LifetimeEventOccured += Model_LifetimeEventOccured;
-    if (usePassed)
+    lifetimeObserver.LifetimeEventOccured += OnLifetimeEventOccured;
+    lifetimeObserver.NextTracedCount += OnNextTracedCount;
+    if (withLogStyle)
     {
-        lifetimeObserver.ProxyPassthroughOccured += LifetimeObserver_ProxyPassthroughOccured;
+        lifetimeObserver.ProxyPassthroughOccured += OnProxyPassthroughOccured;
     }
-    int i = 0;
     IEnumerable<IModel?> stream = AuxMethods.PlayScript(host, script);
     try
     {
@@ -122,33 +130,29 @@ using (IHost host = builder.Build())
             {
                 int id = model!.Id;
             }
-            Console.WriteLine($"log: Variant {model!.GetType()} {model.GetHashCode()} {model.Variant}");
-            if (++i % 100 == 0)
+            if (withLogStyle)
             {
-                PrintInfo();
-                GC.Collect(GC.MaxGeneration, GCCollectionMode.Forced, true);
-                GC.WaitForPendingFinalizers();
+                Console.WriteLine($"log: Variant {model!.GetType()} {model.GetHashCode()} {model.Variant}");
             }
         }
     }
     catch (BreakStreamException) { }
 }
+
 references?.Clear();
-GC.Collect(GC.MaxGeneration, GCCollectionMode.Forced, true);
-GC.WaitForPendingFinalizers();
-PrintInfo();
+if (withLogStyle)
+{
+    Console.WriteLine($"log: Finished");
+}
+CollectGarbageAndPrintInfo();
 Console.WriteLine("done");
-void LifetimeObserver_ProxyPassthroughOccured(object? sender, ProxyPassthroughEventArgs args)
+void OnProxyPassthroughOccured(object? sender, ProxyPassthroughEventArgs args)
 {
     Console.WriteLine($"log: Passed {args.Type} {args.Hash}");
 }
-void Model_ConstructorEventOccured(object? sender, LifetimeEventArgs args)
-{
-    Console.WriteLine($"log: {args.Kind} {args.Type} {args.Hash}");
-}
 void PrintInfo()
 {
-    if (!usePassed)
+    if (!withLogStyle)
     {
         int i = headerLinesCount - 1;
         int total = 0;
@@ -169,28 +173,38 @@ void PrintInfo()
         Console.WriteLine($"total: {total}");
     }
 }
-void Model_LifetimeEventOccured(object? sender, LifetimeEventArgs args)
+void OnLifetimeEventOccured(object? sender, LifetimeEventArgs args)
 {
-    if (usePassed)
+    if (withLogStyle)
     {
-        Console.WriteLine($"log: {args.Kind} {args.Type} {args.Hash}");
-    }
-    lock (counts)
-    {
-        if (args.Kind is LifetimeEventKind.Created)
+        if(sender is LifetimeObserver)
         {
-            if (!counts.TryGetValue(args.Type, out int value))
-            {
-                counts.Add(args.Type, 1);
-            }
-            else
-            {
-                counts[args.Type] = ++value;
-            }
+            Console.WriteLine($"log: {(args.Kind is LifetimeEventKind.Created ? "Traced" : "Untraced")} {args.Type} {args.Hash}");
         }
         else
         {
-            --counts[args.Type];
+            Console.WriteLine($"log: {args.Kind} {args.Type} {args.Hash}");
+        }
+    }
+    if(sender is LifetimeObserver)
+    {
+        lock (locker)
+        {
+            if (args.Kind is LifetimeEventKind.Created)
+            {
+                if (!counts.TryGetValue(args.Type, out int value))
+                {
+                    counts.Add(args.Type, 1);
+                }
+                else
+                {
+                    counts[args.Type] = ++value;
+                }
+            }
+            else
+            {
+                --counts[args.Type];
+            }
         }
     }
 }
@@ -198,6 +212,16 @@ void Console_CancelKeyPress(object? sender, ConsoleCancelEventArgs e)
 {
     isRunning = false;
     e.Cancel = true;
+}
+void OnNextTracedCount(object? sender, EventArgs e)
+{
+    CollectGarbageAndPrintInfo();
+}
+void CollectGarbageAndPrintInfo()
+{
+    GC.Collect(GC.MaxGeneration, GCCollectionMode.Forced, true);
+    GC.WaitForPendingFinalizers();
+    PrintInfo();
 }
 class BreakStreamException : Exception { }
 

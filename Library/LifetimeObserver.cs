@@ -5,13 +5,17 @@ public class LifetimeObserver
 {
     public event LifetimeEventHandler? LifetimeEventOccured;
     public event ProxyPassthroughEventHandler? ProxyPassthroughOccured;
+    public event EventHandler? NextTracedCount;
     private readonly ConditionalWeakTable<object, Tracer> _tracers = [];
     private readonly Dictionary<object, Key> _keys = [];
     private readonly Key _noKey = new();
     private readonly List<ServiceDescriptor> _replacements = [];
     private readonly object _lock = new();
     private readonly HashSet<Type> _tracedTypes = [];
+    private readonly EventArgs _nextTracedCount = new();
     private IServiceCollection? _serviceDescriptors;
+    private int _tracedCount = 0;
+    public int CountTracedForRaisingEvent { get; set; } = 100;
     public void Trace(Type type)
     {
         if (_serviceDescriptors is null)
@@ -40,7 +44,11 @@ public class LifetimeObserver
         ).ToArray();
         if (descriptors.Length == 0)
         {
-            throw new InvalidOperationException($"No service for type {type} found!");
+            throw new LifetimeObserverException($"No service for type {type} found!") 
+            { 
+                Type = type, 
+                KindOfError = LifetimeObserverException.Kind.NoServiceRegisteredForType
+            };
         }
         foreach (ServiceDescriptor sd in descriptors)
         {
@@ -186,7 +194,6 @@ public class LifetimeObserver
                     Hash = result.GetHashCode() 
                 });
             }
-            //Console.WriteLine($"/{result.GetType()}@{result.GetHashCode()}");
             if (!_tracers.TryGetValue(result, out _))
             {
                 lock (_lock)
@@ -194,6 +201,12 @@ public class LifetimeObserver
                     if (!_tracers.TryGetValue(result, out _))
                     {
                         _tracers.Add(result, new Tracer(this, result));
+                        ++_tracedCount;
+                        if(_tracedCount >= CountTracedForRaisingEvent)
+                        {
+                            NextTracedCount?.Invoke(this, _nextTracedCount);
+                            _tracedCount = 0;
+                        }
                     }
                 }
             }
