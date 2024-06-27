@@ -7,6 +7,7 @@ All classes are contained in the `Net.Leksi.Util` namespace.
 
 * [LifetimeObserver](https://github.com/Leksiqq/LifetimeObserver/wiki/LifetimeObserver-en) - library facade class. Registers in the dependency injection container as a _Singleton_ service.
 * [LifetimeObserverException](https://github.com/Leksiqq/LifetimeObserver/wiki/LifetimeObserverException-en) - Specialized exception type.
+* [LifetimeEventArgs](https://github.com/Leksiqq/LifetimeObserver/wiki/LifetimeEventArgs-en) - the type of the event argument associated with the object's lifetime.
 
 The principles of using the library are described in the section [Demo and principles of use](https://github.com/Leksiqq/LifetimeObserver/wiki/Demo-and-principles-of-use).
 
