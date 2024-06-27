@@ -16,11 +16,22 @@ public class LifetimeObserver
     private IServiceCollection? _serviceDescriptors;
     private int _tracedCount = 0;
     public int CountTracedForRaisingEvent { get; set; } = 100;
+    public static void Add(IServiceCollection services, Action<LifetimeObserver> config)
+    {
+        LifetimeObserver lifetimeObserver = new();
+        lifetimeObserver.StartConfiguring(services);
+        config.Invoke(lifetimeObserver);
+        services.AddSingleton(lifetimeObserver);
+        lifetimeObserver.FinishConfiguring();
+    }
     public void Trace(Type type)
     {
         if (_serviceDescriptors is null)
         {
-            throw new InvalidOperationException();
+            throw new LifetimeObserverException("Must be called inside of configuring action.")
+            {
+                KindOfError = LifetimeObserverException.Kind.CalledOutsideOfConfiguring
+            };
         }
         _tracedTypes.Add(type);
         ServiceDescriptor[] descriptors = _serviceDescriptors!.Where(sd => 
@@ -158,7 +169,10 @@ public class LifetimeObserver
     {
         if(_serviceDescriptors is { })
         {
-            throw new InvalidOperationException();
+            throw new LifetimeObserverException("Must be called after the host is built.")
+            {
+                KindOfError = LifetimeObserverException.Kind.CalledBeforeHostIsBuilt
+            };
         }
         return _tracedTypes.Select(t => t);
     }
