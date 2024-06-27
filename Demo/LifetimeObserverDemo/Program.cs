@@ -23,7 +23,7 @@ void Usage()
 {
     Console.WriteLine(
         string.Format(
-            "Usage:\n {0} [--{1}} <number>] [--{2}} <number>] [--{3} <number>] [--{4} {{1|0}}] [--{5} <number>]",
+            "Usage:\n {0} [--{1} <number>] [--{2} <number>] [--{3} <number>] [--{4} {{1|0}}] [--{5} <number>]",
             Path.GetFileName(Environment.ProcessPath),
             s_referencedCount,
             s_requestsCount,
@@ -84,6 +84,7 @@ if (withLogStyle)
 }
 else
 {
+    (_, headerLinesCount) = Console.GetCursorPosition();
     Console.WriteLine($"{nameof(referencedCount)}: {referencedCount}");
     ++headerLinesCount;
     Console.WriteLine($"{(prevSeed != seed ? "generated " : string.Empty)}{nameof(seed)}: {seed}");
