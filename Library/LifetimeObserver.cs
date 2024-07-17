@@ -26,7 +26,7 @@ public class LifetimeObserver
     }
     public void Trace(Type type)
     {
-        if (_serviceDescriptors is null)
+        if (_serviceDescriptors == null)
         {
             throw new LifetimeObserverException("Must be called inside of configuring action.")
             {
@@ -83,7 +83,7 @@ public class LifetimeObserver
             _serviceDescriptors.Remove(sd);
             if (sd.IsKeyedService)
             {
-                if (sd.KeyedImplementationType is { })
+                if (sd.KeyedImplementationType != null)
                 {
                     _replacements.Add(
                         new ServiceDescriptor(
@@ -94,7 +94,7 @@ public class LifetimeObserver
                         )
                     );
                 }
-                else if (sd.KeyedImplementationInstance is { })
+                else if (sd.KeyedImplementationInstance != null)
                 {
                     _replacements.Add(
                         new ServiceDescriptor(
@@ -104,7 +104,7 @@ public class LifetimeObserver
                         )
                     );
                 }
-                else if (sd.KeyedImplementationFactory is { })
+                else if (sd.KeyedImplementationFactory != null)
                 {
                     _replacements.Add(
                         new ServiceDescriptor(
@@ -126,7 +126,7 @@ public class LifetimeObserver
             }
             else
             {
-                if (sd.ImplementationType is { })
+                if (sd.ImplementationType != null)
                 {
                     _replacements.Add(
                         new ServiceDescriptor(
@@ -137,7 +137,7 @@ public class LifetimeObserver
                         )
                     );
                 }
-                else if (sd.ImplementationInstance is { })
+                else if (sd.ImplementationInstance != null)
                 {
                     _replacements.Add(
                         new ServiceDescriptor(
@@ -147,7 +147,7 @@ public class LifetimeObserver
                         )
                     );
                 }
-                else if (sd.ImplementationFactory is { })
+                else if (sd.ImplementationFactory != null)
                 {
                     _replacements.Add(
                         new ServiceDescriptor(
@@ -174,7 +174,7 @@ public class LifetimeObserver
     }
     public IEnumerable<Type> GetTracedTypes()
     {
-        if(_serviceDescriptors is { })
+        if(_serviceDescriptors != null)
         {
             throw new LifetimeObserverException("Must be called after the host is built.")
             {
@@ -194,6 +194,29 @@ public class LifetimeObserver
             }
         }
         return false;
+    }
+    public void TraceObject(object obj, object? info = null) 
+    {
+        if (!_tracers.TryGetValue(obj, out _))
+        {
+            lock (_lock)
+            {
+                if (!_tracers.TryGetValue(obj, out _))
+                {
+                    _tracers.Add(obj, new Tracer(this, obj));
+                    if(info != null)
+                    {
+                        ChangeInfo(obj, info);
+                    }
+                    ++_tracedCount;
+                    if (_tracedCount >= CountTracedForRaisingEvent)
+                    {
+                        NextTracedCount?.Invoke(this, _nextTracedCount);
+                        _tracedCount = 0;
+                    }
+                }
+            }
+        }
     }
     internal void StartConfiguring(IServiceCollection services)
     {
@@ -218,7 +241,7 @@ public class LifetimeObserver
         object result = serviceProvider.GetRequiredKeyedService(serviceType, serviceKey);
         if(result.GetType() == expectedType)
         {
-            if(ProxyPassthroughOccured is { })
+            if(ProxyPassthroughOccured != null)
             {
                 ProxyPassthroughOccured.Invoke(this, new ProxyPassthroughEventArgs { 
                     ServiceType = serviceType, 
@@ -227,22 +250,7 @@ public class LifetimeObserver
                     Hash = result.GetHashCode() 
                 });
             }
-            if (!_tracers.TryGetValue(result, out _))
-            {
-                lock (_lock)
-                {
-                    if (!_tracers.TryGetValue(result, out _))
-                    {
-                        _tracers.Add(result, new Tracer(this, result));
-                        ++_tracedCount;
-                        if(_tracedCount >= CountTracedForRaisingEvent)
-                        {
-                            NextTracedCount?.Invoke(this, _nextTracedCount);
-                            _tracedCount = 0;
-                        }
-                    }
-                }
-            }
+            TraceObject(result);
         }
         return result;
     }
