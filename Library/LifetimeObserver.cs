@@ -13,6 +13,7 @@ public class LifetimeObserver
     private readonly object _lock = new();
     private readonly HashSet<Type> _tracedTypes = [];
     private readonly EventArgs _nextTracedCount = new();
+    private readonly Dictionary<Type, Dictionary<int, LifetimeEventKind>> _syncSequence = [];
     private IServiceCollection? _serviceDescriptors;
     private int _tracedCount = 0;
     public int CountTracedForRaisingEvent { get; set; } = 100;
@@ -42,6 +43,7 @@ public class LifetimeObserver
             };
         }
         _tracedTypes.Add(type);
+        _syncSequence.Add(type, []);
         if(!manual)
         {
             ServiceDescriptor[] descriptors = _serviceDescriptors!.Where(sd =>
@@ -240,7 +242,26 @@ public class LifetimeObserver
     }
     internal void ReportLifetimeEvent(LifetimeEventKind kind, Type type, int hash, object? info)
     {
-        LifetimeEventOccured?.Invoke(this, new LifetimeEventArgs { Kind = kind, Type = type, Hash = hash, Info = info });
+        lock(type)
+        {
+            if(!_syncSequence[type].TryGetValue(hash, out LifetimeEventKind prevKind))
+            {
+                _syncSequence[type].Add(hash, kind);
+                if (kind == LifetimeEventKind.Created) 
+                {
+                    LifetimeEventOccured?.Invoke(this, new LifetimeEventArgs { Kind = kind, Type = type, Hash = hash, Info = info });
+                }
+            }
+            else if(prevKind == LifetimeEventKind.Finalized)
+            {
+                LifetimeEventOccured?.Invoke(this, new LifetimeEventArgs { Kind = LifetimeEventKind.Created, Type = type, Hash = hash, Info = info });
+                LifetimeEventOccured?.Invoke(this, new LifetimeEventArgs { Kind = LifetimeEventKind.Finalized, Type = type, Hash = hash, Info = info });
+            }
+            else
+            {
+                LifetimeEventOccured?.Invoke(this, new LifetimeEventArgs { Kind = LifetimeEventKind.Finalized, Type = type, Hash = hash, Info = info });
+            }
+        }
     }
     private object GetService(IServiceProvider serviceProvider, Type serviceType, Key serviceKey, Type expectedType)
     {
