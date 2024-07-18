@@ -24,7 +24,7 @@ public class LifetimeObserver
         services.AddSingleton(lifetimeObserver);
         lifetimeObserver.FinishConfiguring();
     }
-    public void Trace(Type type)
+    public void Trace(Type type, bool manual = false)
     {
         if (_serviceDescriptors == null)
         {
@@ -42,135 +42,138 @@ public class LifetimeObserver
             };
         }
         _tracedTypes.Add(type);
-        ServiceDescriptor[] descriptors = _serviceDescriptors!.Where(sd => 
-            (
-                !sd.IsKeyedService 
-                && (
-                    sd.ImplementationType == type
-                    || sd.ImplementationInstance?.GetType() == type
-                    || (sd.ImplementationFactory?.Method.ReturnType.IsAssignableFrom(type) ?? false)
-                )
-            )
-            || (
-                sd.IsKeyedService
-                && (
-                    sd.KeyedImplementationType == type
-                    || sd.KeyedImplementationInstance?.GetType() == type
-                    || (sd.KeyedImplementationFactory?.Method.ReturnType.IsAssignableFrom(type) ?? false)
-                )
-            )
-        ).ToArray();
-        if (descriptors.Length == 0)
+        if(!manual)
         {
-            throw new LifetimeObserverException($"No service for type {type} found!") 
-            { 
-                Type = type, 
-                KindOfError = LifetimeObserverException.Kind.NoServiceRegisteredForType
-            };
-        }
-        foreach (ServiceDescriptor sd in descriptors)
-        {
-            Key key = _noKey;
-            if (sd.IsKeyedService)
-            {
-                if (!_keys.TryGetValue(sd.ServiceKey!, out Key? savedKey))
-                {
-                    savedKey = new Key(sd.ServiceKey);
-                    _keys.Add(sd.ServiceKey!, savedKey);
-                }
-                key = savedKey;
-            }
-            _serviceDescriptors.Remove(sd);
-            if (sd.IsKeyedService)
-            {
-                if (sd.KeyedImplementationType != null)
-                {
-                    _replacements.Add(
-                        new ServiceDescriptor(
-                            sd.ServiceType,
-                            key,
-                            sd.KeyedImplementationType,
-                            sd.Lifetime
-                        )
-                    );
-                }
-                else if (sd.KeyedImplementationInstance != null)
-                {
-                    _replacements.Add(
-                        new ServiceDescriptor(
-                            sd.ServiceType,
-                            key,
-                            sd.KeyedImplementationInstance
-                        )
-                    );
-                }
-                else if (sd.KeyedImplementationFactory != null)
-                {
-                    _replacements.Add(
-                        new ServiceDescriptor(
-                            sd.ServiceType,
-                            key,
-                            (s, k) => sd.KeyedImplementationFactory.Invoke(s, key.SourceKey),
-                            sd.Lifetime
-                        )
-                    );
-                }
-                _replacements.Add(
-                    new ServiceDescriptor(
-                        sd.ServiceType,
-                        sd.ServiceKey,
-                        (s, k) => GetService(s, sd.ServiceType, key, type),
-                        sd.Lifetime
+            ServiceDescriptor[] descriptors = _serviceDescriptors!.Where(sd =>
+                (
+                    !sd.IsKeyedService
+                    && (
+                        sd.ImplementationType == type
+                        || sd.ImplementationInstance?.GetType() == type
+                        || (sd.ImplementationFactory?.Method.ReturnType.IsAssignableFrom(type) ?? false)
                     )
-                );
-            }
-            else
-            {
-                if (sd.ImplementationType != null)
-                {
-                    _replacements.Add(
-                        new ServiceDescriptor(
-                            sd.ServiceType,
-                            key,
-                            sd.ImplementationType,
-                            sd.Lifetime
-                        )
-                    );
-                }
-                else if (sd.ImplementationInstance != null)
-                {
-                    _replacements.Add(
-                        new ServiceDescriptor(
-                            sd.ServiceType,
-                            key,
-                            sd.ImplementationInstance
-                        )
-                    );
-                }
-                else if (sd.ImplementationFactory != null)
-                {
-                    _replacements.Add(
-                        new ServiceDescriptor(
-                            sd.ServiceType,
-                            key,
-                            (s, k) => sd.ImplementationFactory.Invoke(s),
-                            sd.Lifetime
-                        )
-                    );
-                }
-                _replacements.Add(
-                    new ServiceDescriptor(
-                        sd.ServiceType,
-                        s => GetService(s, sd.ServiceType, key, type),
-                        sd.Lifetime
+                )
+                || (
+                    sd.IsKeyedService
+                    && (
+                        sd.KeyedImplementationType == type
+                        || sd.KeyedImplementationInstance?.GetType() == type
+                        || (sd.KeyedImplementationFactory?.Method.ReturnType.IsAssignableFrom(type) ?? false)
                     )
-                );
+                )
+            ).ToArray();
+            if (descriptors.Length == 0)
+            {
+                throw new LifetimeObserverException($"No service for type {type} found!")
+                {
+                    Type = type,
+                    KindOfError = LifetimeObserverException.Kind.NoServiceRegisteredForType
+                };
+            }
+            foreach (ServiceDescriptor sd in descriptors)
+            {
+                Key key = _noKey;
+                if (sd.IsKeyedService)
+                {
+                    if (!_keys.TryGetValue(sd.ServiceKey!, out Key? savedKey))
+                    {
+                        savedKey = new Key(sd.ServiceKey);
+                        _keys.Add(sd.ServiceKey!, savedKey);
+                    }
+                    key = savedKey;
+                }
+                _serviceDescriptors.Remove(sd);
+                if (sd.IsKeyedService)
+                {
+                    if (sd.KeyedImplementationType != null)
+                    {
+                        _replacements.Add(
+                            new ServiceDescriptor(
+                                sd.ServiceType,
+                                key,
+                                sd.KeyedImplementationType,
+                                sd.Lifetime
+                            )
+                        );
+                    }
+                    else if (sd.KeyedImplementationInstance != null)
+                    {
+                        _replacements.Add(
+                            new ServiceDescriptor(
+                                sd.ServiceType,
+                                key,
+                                sd.KeyedImplementationInstance
+                            )
+                        );
+                    }
+                    else if (sd.KeyedImplementationFactory != null)
+                    {
+                        _replacements.Add(
+                            new ServiceDescriptor(
+                                sd.ServiceType,
+                                key,
+                                (s, k) => sd.KeyedImplementationFactory.Invoke(s, key.SourceKey),
+                                sd.Lifetime
+                            )
+                        );
+                    }
+                    _replacements.Add(
+                        new ServiceDescriptor(
+                            sd.ServiceType,
+                            sd.ServiceKey,
+                            (s, k) => GetService(s, sd.ServiceType, key, type),
+                            sd.Lifetime
+                        )
+                    );
+                }
+                else
+                {
+                    if (sd.ImplementationType != null)
+                    {
+                        _replacements.Add(
+                            new ServiceDescriptor(
+                                sd.ServiceType,
+                                key,
+                                sd.ImplementationType,
+                                sd.Lifetime
+                            )
+                        );
+                    }
+                    else if (sd.ImplementationInstance != null)
+                    {
+                        _replacements.Add(
+                            new ServiceDescriptor(
+                                sd.ServiceType,
+                                key,
+                                sd.ImplementationInstance
+                            )
+                        );
+                    }
+                    else if (sd.ImplementationFactory != null)
+                    {
+                        _replacements.Add(
+                            new ServiceDescriptor(
+                                sd.ServiceType,
+                                key,
+                                (s, k) => sd.ImplementationFactory.Invoke(s),
+                                sd.Lifetime
+                            )
+                        );
+                    }
+                    _replacements.Add(
+                        new ServiceDescriptor(
+                            sd.ServiceType,
+                            s => GetService(s, sd.ServiceType, key, type),
+                            sd.Lifetime
+                        )
+                    );
+                }
             }
         }
     }
-    public void Trace<T>()
+    public void Trace<T>(bool manual = false)
     {
-        Trace(typeof(T));
+        Trace(typeof(T), manual);
     }
     public IEnumerable<Type> GetTracedTypes()
     {
@@ -197,22 +200,25 @@ public class LifetimeObserver
     }
     public void TraceObject(object obj, object? info = null) 
     {
-        if (!_tracers.TryGetValue(obj, out _))
+        if(_tracedTypes.Contains(obj.GetType()))
         {
-            lock (_lock)
+            if (!_tracers.TryGetValue(obj, out _))
             {
-                if (!_tracers.TryGetValue(obj, out _))
+                lock (_lock)
                 {
-                    _tracers.Add(obj, new Tracer(this, obj));
-                    if(info != null)
+                    if (!_tracers.TryGetValue(obj, out _))
                     {
-                        ChangeInfo(obj, info);
-                    }
-                    ++_tracedCount;
-                    if (_tracedCount >= CountTracedForRaisingEvent)
-                    {
-                        NextTracedCount?.Invoke(this, _nextTracedCount);
-                        _tracedCount = 0;
+                        _tracers.Add(obj, new Tracer(this, obj));
+                        if (info != null)
+                        {
+                            ChangeInfo(obj, info);
+                        }
+                        ++_tracedCount;
+                        if (_tracedCount >= CountTracedForRaisingEvent)
+                        {
+                            NextTracedCount?.Invoke(this, _nextTracedCount);
+                            _tracedCount = 0;
+                        }
                     }
                 }
             }
