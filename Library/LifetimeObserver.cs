@@ -15,7 +15,7 @@ public class LifetimeObserver
     private readonly EventArgs _nextTracedCount = new();
     private IServiceCollection? _serviceDescriptors;
     private int _tracedCount = 0;
-    public int CountTracedForRaisingEvent { get; set; } = 100;
+    public int CountTracedForRaisingEvent { get; set; } = 0;
     public static void Add(IServiceCollection services, Action<LifetimeObserver> config)
     {
         LifetimeObserver lifetimeObserver = new();
@@ -214,7 +214,7 @@ public class LifetimeObserver
                             ChangeInfo(obj, info);
                         }
                         ++_tracedCount;
-                        if (_tracedCount >= CountTracedForRaisingEvent)
+                        if (CountTracedForRaisingEvent > 0 && _tracedCount >= CountTracedForRaisingEvent)
                         {
                             NextTracedCount?.Invoke(this, _nextTracedCount);
                             _tracedCount = 0;
