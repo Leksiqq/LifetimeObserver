@@ -11,16 +11,23 @@ public class LifetimeObserver
     private readonly Key _noKey = new();
     private readonly List<ServiceDescriptor> _replacements = [];
     private readonly object _lock = new();
-    private readonly HashSet<Type> _tracedTypes = [];
+    private readonly Dictionary<Type, bool> _tracedTypes = [];
     private readonly EventArgs _nextTracedCount = new();
     private IServiceCollection? _serviceDescriptors;
     private int _tracedCount = 0;
     public int CountTracedForRaisingEvent { get; set; } = 0;
-    public static void Add(IServiceCollection services, Action<LifetimeObserver> config)
+    public bool IsEnabled { get; private set; }
+    public static void Add(IServiceCollection services, Action<LifetimeObserver> config, bool isEnabled)
     {
-        LifetimeObserver lifetimeObserver = new();
+        LifetimeObserver lifetimeObserver = new()
+        {
+            IsEnabled = isEnabled
+        };
         lifetimeObserver.StartConfiguring(services);
-        config.Invoke(lifetimeObserver);
+        if(isEnabled)
+        {
+            config.Invoke(lifetimeObserver);
+        }
         services.AddSingleton(lifetimeObserver);
         lifetimeObserver.FinishConfiguring();
     }
@@ -41,7 +48,7 @@ public class LifetimeObserver
                 KindOfError = LifetimeObserverException.Kind.NotAClass
             };
         }
-        _tracedTypes.Add(type);
+        _tracedTypes.Add(type, manual);
         if(!manual)
         {
             ServiceDescriptor[] descriptors = _serviceDescriptors!.Where(sd =>
@@ -184,7 +191,7 @@ public class LifetimeObserver
                 KindOfError = LifetimeObserverException.Kind.CalledInsideOfConfiguring
             };
         }
-        return _tracedTypes.Select(t => t);
+        return _tracedTypes.Select(t => t.Key);
     }
     public bool ChangeInfo(object obj, object? info)
     {
@@ -198,9 +205,13 @@ public class LifetimeObserver
         }
         return false;
     }
-    public void TraceObject(object obj, object? info = null) 
+    public void TraceObject(object obj, object? info = null)
     {
-        if(_tracedTypes.Contains(obj.GetType()))
+        TraceObject(obj, info, true);
+    }
+    private void TraceObject(object obj, object? info, bool manual) 
+    {
+        if(_tracedTypes.TryGetValue(obj.GetType(), out bool isManual) && isManual == manual)
         {
             if (!_tracers.TryGetValue(obj, out _))
             {
@@ -256,7 +267,7 @@ public class LifetimeObserver
                     Hash = result.GetHashCode() 
                 });
             }
-            TraceObject(result);
+            TraceObject(result, null, false);
         }
         return result;
     }

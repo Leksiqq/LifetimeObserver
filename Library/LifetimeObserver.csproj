@@ -19,15 +19,16 @@
     <PackageProjectUrl>https://github.com/Leksiqq/LifetimeObserver/wiki</PackageProjectUrl>
     <RepositoryUrl>https://github.com/Leksiqq/LifetimeObserver</RepositoryUrl>
     <IsPackable>true</IsPackable>
-    <Version>1.1.1</Version>
+    <Version>1.2.3</Version>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageTags>lifetime garbage-collection memory-leaks</PackageTags>
     <Description>An utility for checking the release of objects.</Description>
     <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
     <PackageRequireLicenseAcceptance>True</PackageRequireLicenseAcceptance>
-    <PackageOutputPath>../../nuget.local</PackageOutputPath>
+    <PackageOutputPath>../../../nuget.local</PackageOutputPath>
     <PackageReleaseNotes>
       1.1.0           Added a possibility to trace objects not involved with DependencyInjection.
+      1.2.0           Added a possibility to fast enabling/disabling current configuration without boring commenting code.
     </PackageReleaseNotes>
     
   </PropertyGroup>
